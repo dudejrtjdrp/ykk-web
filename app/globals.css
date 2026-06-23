@@ -1,0 +1,366 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   ykk — design tokens (기획서 1장: 종이 위의 놀이터)
+   배경은 순백이 아닌 살짝 어두운 오프화이트(벽), 카드는 한 톤 밝은 종이.
+   ============================================================ */
+:root {
+  color-scheme: light;
+
+  /* surfaces */
+  --canvas: #f3f3f3;        /* 배경(블루프린트 캔버스) */
+  --canvas-deep: #ebebeb;   /* 빈 영역 / 패럴랙스 음영 */
+  --paper: #fbfaf6;         /* 스티커·카드 표면 (벽보다 밝아 떠 있음) */
+  --paper-2: #f4f0e8;       /* 보조 표면 */
+
+  /* blueprint 그리드 라인 (옅은 코발트) */
+  --bp-line: rgba(43, 74, 242, 0.07);
+  --bp-line-strong: rgba(43, 74, 242, 0.13);
+
+  /* ink */
+  --ink: #1a1a18;           /* soft black */
+  --ink-soft: #6e6b63;
+  --line: #d8d5cc;
+
+  /* riso accents */
+  --verm: #e0492a;          /* 주요 액센트 / CTA / 재현성 강조 */
+  --cobalt: #2b4af2;        /* 링크 / 선택 / workflow */
+  --green: #1e9e57;         /* 성공 / 재현성 양호 */
+  --amber: #d69a12;         /* 주의 / 중간 점수 */
+  --sun: #ffd54d;           /* 브랜드 옐로 */
+  --sky: #8ecbf1;
+  --mint: #c7f0d3;
+
+  /* motion */
+  --dur-instant: 80ms;
+  --dur-fast: 160ms;
+  --dur-base: 240ms;
+  --dur-slow: 400ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-entrance: cubic-bezier(0, 0.6, 0.3, 1);
+
+  /* shadows: 단단한 오프셋은 더 작게, 환경 그림자는 더 옅게 (가벼운 인상) */
+  --shadow-hard: 3px 3px 0 0 var(--ink);
+  --shadow-hard-sm: 2px 2px 0 0 var(--ink);
+  --shadow-soft: 0 10px 24px -16px rgba(20, 20, 18, 0.32);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body), "Noto Sans KR", sans-serif;
+  background: var(--canvas);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--canvas);
+}
+
+.display-font {
+  font-family: var(--font-display), "Noto Sans KR", sans-serif;
+}
+
+.mono-font {
+  font-family: var(--font-mono), monospace;
+}
+
+/* ---------- 컴포넌트 유틸 ---------- */
+@layer components {
+  /* 스티커 카드: 종이 표면 + 테두리 + 단일 오프셋 그림자(가볍게) */
+  .sticker {
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    border-radius: 1.1rem;
+    box-shadow: var(--shadow-hard);
+  }
+  .sticker-sm {
+    background: var(--paper);
+    border: 1.5px solid var(--ink);
+    border-radius: 0.9rem;
+    box-shadow: var(--shadow-hard-sm);
+  }
+  .pill {
+    border: 1.5px solid var(--ink);
+    border-radius: 999px;
+    background: var(--paper);
+  }
+  /* 캔버스 위에 떠 있는 가벼운 HUD 칩 — 하드 오프셋 대신 옅은 환경 그림자 */
+  .hud-chip {
+    border: 1.5px solid var(--ink);
+    border-radius: 999px;
+    background: var(--paper);
+    box-shadow: var(--shadow-soft);
+  }
+  .wall-grain {
+    background-image: radial-gradient(rgba(26, 26, 24, 0.06) 1px, transparent 1.4px);
+    background-size: 26px 26px;
+  }
+  .focus-ring:focus-visible {
+    outline: 3px solid var(--cobalt);
+    outline-offset: 2px;
+  }
+}
+
+/* ---------- 캔버스 전용 ---------- */
+.canvas-stage {
+  touch-action: none;            /* 브라우저 패닝/줌 제스처 차단 → 직접 제어 */
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+  cursor: grab;
+}
+/* 블루프린트 그리드 — #F3F3F3 위 옅은 코발트 소/대 격자.
+   캔버스에서는 background-size/position 을 엔진이 월드 변환에 맞춰 갱신(팬·줌 따라감).
+   정적 표면(피드 등)은 아래 기본 사이즈로 고정 격자. */
+.blueprint-bg {
+  background-color: var(--canvas);
+  background-image:
+    linear-gradient(var(--bp-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bp-line) 1px, transparent 1px),
+    linear-gradient(var(--bp-line-strong) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, var(--bp-line-strong) 1.5px, transparent 1.5px);
+  background-size: 40px 40px, 40px 40px, 200px 200px, 200px 200px;
+  background-position: 0 0;
+}
+.canvas-stage[data-panning="true"] {
+  cursor: grabbing;
+}
+.canvas-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* 등장 애니메이션 */
+@keyframes sticker-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0% { background-position: -460px 0; }
+  100% { background-position: 460px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--paper-2) 25%, #ece7dd 37%, var(--paper-2) 63%);
+  background-size: 920px 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+.skeleton-soft {
+  background: linear-gradient(90deg, var(--paper-2) 25%, #efe9de 37%, var(--paper-2) 63%);
+  background-size: 920px 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+/* ============================================================
+   인터랙션 레이어 — 커스텀 커서 · 마그네틱 글로우 · hover 물성
+   (transform/opacity 중심, GPU 합성. 캔버스 엔진은 건드리지 않음)
+   ============================================================ */
+
+/* 커스텀 커서 활성 시 네이티브 커서 숨김 (터치/reduced-motion 이면 클래스가 안 붙음) */
+body.has-custom-cursor,
+body.has-custom-cursor * {
+  cursor: none !important;
+}
+.cursor-root {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.cursor-blob,
+.cursor-dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+  will-change: transform;
+}
+.cursor-blob {
+  width: 34px;
+  height: 34px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  box-shadow: var(--shadow-soft);
+  transition: background 0.18s ease, border-color 0.18s ease, border-radius 0.22s ease,
+    box-shadow 0.18s ease;
+}
+.cursor-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--ink);
+  transition: opacity 0.18s ease, background 0.18s ease;
+}
+/* 링크·버튼·스티커 위: 검정으로 채우지 않고, 둥근 사각형 영역의 배경을 반전 */
+.cursor-root[data-mode="hover"] .cursor-blob {
+  background: rgba(251, 250, 246, 0); /* --paper 의 투명판 — 다크 틴트 없이 페이드 */
+  border-color: transparent;
+  box-shadow: none;
+  border-radius: 36%;
+  backdrop-filter: invert(1);
+  -webkit-backdrop-filter: invert(1);
+}
+.cursor-root[data-mode="hover"] .cursor-dot {
+  opacity: 0;
+}
+/* 캔버스 빈 영역(grab): 브랜드 옐로 + 라운드 사각 */
+.cursor-root[data-mode="grab"] .cursor-blob,
+.cursor-root[data-mode="grabbing"] .cursor-blob {
+  background: var(--sun);
+  border-radius: 42%;
+}
+.cursor-root[data-mode="grabbing"] .cursor-dot {
+  opacity: 0;
+}
+/* 입력 필드(text): 얇은 캐럿 느낌 */
+.cursor-root[data-mode="text"] .cursor-blob {
+  background: transparent;
+  width: 3px;
+  border-radius: 4px;
+}
+
+/* 마그네틱 버튼 내부 글로우 — JS 가 --mx/--my(px) 를 갱신 */
+.btn-glow {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.btn-glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(
+    140px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 255, 255, 0.4),
+    transparent 62%
+  );
+  opacity: 0;
+  transition: opacity 0.28s ease;
+  pointer-events: none;
+}
+.btn-glow:hover::after {
+  opacity: 1;
+}
+/* 밝은 표면 버튼은 잉크 빛으로 */
+.btn-glow[data-glow="ink"]::after {
+  background: radial-gradient(
+    150px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(43, 74, 242, 0.16),
+    transparent 60%
+  );
+}
+
+/* 종이 컷아웃 실루엣 카드 — 텍스트 없는 색면 + 잘라낸 종이처럼 떠 있는 그림자.
+   drop-shadow 는 사각 박스가 아니라 실루엣(알파)을 따라가 진짜 '오려낸 종이' 느낌.
+   인라인 transform 끝에 scale(var(--hs,1)) 를 붙여 hover 시 부드럽게 살아남. */
+.cut-sticker {
+  --hs: 1;
+  -webkit-tap-highlight-color: transparent;
+  filter: drop-shadow(3px 4px 0 rgba(26, 26, 24, 0.18))
+    drop-shadow(0 9px 13px rgba(20, 20, 18, 0.16));
+  transition: transform 200ms var(--ease-standard), filter 220ms var(--ease-standard);
+}
+.cut-sticker:hover {
+  --hs: 1.07;
+  filter: drop-shadow(5px 7px 0 rgba(26, 26, 24, 0.24))
+    drop-shadow(0 16px 22px rgba(20, 20, 18, 0.22)) saturate(1.04);
+}
+.cut-sticker:active {
+  --hs: 0.98;
+}
+/* 검색 이동·선택된 카드 포커스 — 실루엣(알파)을 따라 도는 브랜드 옐로 외곽선.
+   다른 곳(빈 캔버스)을 누르면 상위에서 is-focused 가 제거되어 부드럽게 해제. */
+.cut-sticker.is-focused {
+  --hs: 1.06;
+  z-index: 30;
+  /* 0px 오프셋·작은 블러를 겹쳐 실루엣을 고르게 감싸는 옐로 외곽선 + 옅은 글로우 */
+  filter: drop-shadow(0 0 1px var(--sun)) drop-shadow(0 0 1px var(--sun))
+    drop-shadow(0 0 2px var(--sun)) drop-shadow(0 0 6px rgba(255, 213, 77, 0.7))
+    drop-shadow(3px 4px 0 rgba(26, 26, 24, 0.2))
+    drop-shadow(0 12px 16px rgba(20, 20, 18, 0.18));
+}
+.cut-sticker.is-focused:hover {
+  --hs: 1.1;
+}
+/* 실루엣 SVG — 컨테이너를 가득 채우고, 잉크 외곽선은 줌과 무관하게 일정 두께 */
+.cut-shape {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.cut-shape .cut-outline {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+}
+
+/* 표면 카드 lift — Framer Motion 미사용 영역의 폴백/보조 */
+.lift {
+  transition: transform 220ms var(--ease-standard), box-shadow 220ms var(--ease-standard);
+}
+
+/* 이미지/색면 hover 줌 — 부모 .img-frame(overflow hidden) 안에서 .img-zoom 만 확대 */
+.img-frame {
+  overflow: hidden;
+}
+.img-zoom {
+  transition: transform 520ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+  will-change: transform;
+}
+.img-frame:hover .img-zoom {
+  transform: scale(1.06);
+}
+
+/* ---------- prefers-reduced-motion (기획서 9.1) ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
