@@ -1,11 +1,13 @@
 "use client";
 
-// 환경 정보 카드 (기획서 4.3.2) — 모노 표기 + 복사
+// 환경 정보 카드 (기획서 4.3.2) — 모노 표기 + 복사 + 모델·비용 표시(솔루션 ②)
 import { useState } from "react";
 import type { EnvSpec } from "@/lib/types";
+import { modelCost } from "@/lib/format";
 
 export function EnvCard({ env }: { env: EnvSpec }) {
   const [copied, setCopied] = useState<string | null>(null);
+  const cost = modelCost(env.model);
 
   const rows: Array<[string, string]> = [
     ["Model", env.model],
@@ -36,7 +38,25 @@ export function EnvCard({ env }: { env: EnvSpec }) {
           {copied === "__all" ? "복사됨 ✓" : "전체 복사"}
         </button>
       </div>
-      <dl className="mt-3 grid grid-cols-2 gap-2">
+
+      {/* 모델·비용 표시 — 어떤 모델로 검증됐는지 / 실행 비용 / 무료 가능 여부 */}
+      <div
+        className="mt-3 flex items-center gap-2 rounded-xl border-2 border-black p-2.5"
+        style={{ background: cost.free ? "var(--mint)" : "var(--paper-2)" }}
+      >
+        <span className="grid size-7 shrink-0 place-items-center rounded-full border-2 border-black bg-white text-sm" aria-hidden>
+          {cost.free ? "○" : "₩"}
+        </span>
+        <div className="min-w-0">
+          <p className="text-[0.8rem] font-bold leading-tight">
+            {cost.label}
+            <span className="mono-font ml-1.5 font-semibold text-black/55">{cost.perRun}</span>
+          </p>
+          <p className="text-[0.7rem] leading-snug text-black/60">{cost.note}</p>
+        </div>
+      </div>
+
+      <dl className="mt-2 grid grid-cols-2 gap-2">
         {rows.map(([k, v]) => (
           <button
             key={k}

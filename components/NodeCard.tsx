@@ -7,13 +7,14 @@
 import Link from "next/link";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import type { CanvasNode } from "@/lib/types";
-import { krw, scoreColor, typeLabel } from "@/lib/format";
+import { krw, modelCost, scoreColor, typeLabel } from "@/lib/format";
 import { useSaved } from "@/lib/store";
 import { spring, springOpts } from "@/lib/motion";
 
 export function NodeCard({ node }: { node: CanvasNode }) {
   const saved = useSaved();
   const isSaved = saved.isSaved(node.slug);
+  const cost = modelCost(node.model);
 
   // -0.5..0.5 정규화된 포인터 위치
   const px = useMotionValue(0);
@@ -71,7 +72,17 @@ export function NodeCard({ node }: { node: CanvasNode }) {
       </Link>
 
       <div className="flex items-center justify-between border-t-2 border-black px-4 py-2.5">
-        <span className="mono-font text-sm font-bold">{krw(node.priceKrw)}</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="mono-font text-sm font-bold">{krw(node.priceKrw)}</span>
+          <span
+            title={cost.note}
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border-2 border-black px-1.5 py-0.5 text-[0.55rem] font-bold"
+            style={{ background: cost.free ? "var(--mint)" : "var(--paper-2)" }}
+          >
+            <span className="size-1.5 rounded-full" style={{ background: cost.free ? "var(--green)" : "var(--amber)" }} aria-hidden />
+            {cost.free ? "무료 실행" : "유료 실행"}
+          </span>
+        </div>
         <motion.button
           type="button"
           aria-label={isSaved ? "저장 취소" : "작업실에 저장"}

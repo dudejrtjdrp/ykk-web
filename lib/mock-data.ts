@@ -9,6 +9,7 @@ import type {
   Creator,
   EnvSpec,
   GalleryResult,
+  PromptSegment,
   Recipe,
   RecipeType,
   Region,
@@ -99,6 +100,8 @@ interface RecipeContent {
   afterSample: string;
   bundleCount?: number;
   steps?: string[];
+  promptBody?: string;
+  anatomy?: PromptSegment[];
 }
 
 const G = (id: string, author: string, kind: string, caption: string, aspect: number, color: string): GalleryResult => ({ id, author, kind, caption, aspect, color, image: "" });
@@ -138,6 +141,14 @@ export const recipeContents: RecipeContent[] = [
     beforeSample: "발표 주제: 'ESG 경영 사례' — 그냥 자료 찾아서 슬라이드 채움. 흐름이 들쭉날쭉.",
     afterSample: "주제를 3개 핵심 주장으로 분해 → 각 주장에 근거 슬라이드 1장 + 데이터 시각화 지시 + 발표자 노트(말할 문장)까지 자동 구성.",
     steps: ["주제 분해", "주장-근거 매핑", "슬라이드 골격", "비주얼 지시", "발표자 노트"],
+    promptBody:
+      "너는 대학 발표를 코칭하는 조교야. 아래 [주제]를 3개의 핵심 주장으로 분해해.\n각 주장마다 (1) 근거 슬라이드 1장, (2) 데이터 시각화 지시 1줄, (3) 발표자가 말할 노트 2~3문장을 만들어.\n출력은 '슬라이드 번호 / 제목 / 본문 / 시각화 / 발표노트' 표로 정리해.\n주제: [여기에 발표 주제]",
+    anatomy: [
+      { label: "역할 부여", snippet: "너는 대학 발표를 코칭하는 조교야", effect: "‘조교’ 페르소나를 주면 학생 눈높이의 평가 기준으로 답한다. 역할이 없으면 일반론으로 흐른다." },
+      { label: "구조 강제", snippet: "3개의 핵심 주장으로 분해해", effect: "‘발표 만들어줘’ 대신 분해 개수를 못 박아, 매번 같은 골격이 나오게 한다 — 재현성의 핵심." },
+      { label: "산출물 수치화", snippet: "근거 슬라이드 1장, 시각화 1줄, 노트 2~3문장", effect: "슬라이드마다 받을 결과물을 숫자로 고정해 분량이 들쑥날쑥하지 않게 한다." },
+      { label: "출력 형식 고정", snippet: "슬라이드 번호 / 제목 / … 표로", effect: "표 형식을 지정하면 바로 슬라이드로 옮기기 쉽고 결과 일관성이 올라간다." },
+    ],
   },
   {
     slug: "job-statement-kit",
@@ -170,6 +181,14 @@ export const recipeContents: RecipeContent[] = [
     afterSample: "경험을 Situation–Task–Action–Result로 자동 구조화하고, 직무 키워드에 맞춰 문장을 재작성. 예상 면접 질문 12개와 모범 답변까지.",
     bundleCount: 4,
     steps: ["자소서 초안", "STAR 구조화", "예상 질문", "모의 답변"],
+    promptBody:
+      "아래 [경험]을 STAR(Situation-Task-Action-Result)로 구조화해줘.\n지원 직무는 [직무]. 먼저 직무 키워드 5개를 뽑고, 각 문장이 그 키워드와 연결되도록 자소서 문항 답변을 350자로 써줘.\n그다음 이 답변에서 나올 수 있는 면접 질문 5개와 모범 답변 개요를 만들어줘.\n경험: [여기에 경험 메모]",
+    anatomy: [
+      { label: "프레임워크 지정", snippet: "STAR(Situation-Task-Action-Result)로 구조화", effect: "검증된 자소서 프레임을 못 박아, 경험 나열이 아니라 ‘상황-과제-행동-결과’ 서사로 정리되게 한다." },
+      { label: "키워드 선추출", snippet: "먼저 직무 키워드 5개를 뽑고", effect: "답변을 쓰기 전 직무 키워드를 먼저 뽑게 해, 문장이 직무와 따로 노는 걸 막는다(사고 순서 고정)." },
+      { label: "분량 제약", snippet: "350자로 써줘", effect: "글자 수를 지정하면 실제 자소서 칸에 맞고, 모델이 늘어지는 걸 막는다." },
+      { label: "후속 단계 연결", snippet: "면접 질문 5개와 모범 답변 개요", effect: "자소서에서 면접까지 한 흐름으로 이어, 같은 경험을 재가공하게 한다(번들의 연결 고리)." },
+    ],
   },
   {
     slug: "startup-ir-deck",
@@ -201,6 +220,14 @@ export const recipeContents: RecipeContent[] = [
     beforeSample: "아이디어는 있는데 투자자에게 어떻게 보여줄지 막막. 덱이 산만함.",
     afterSample: "문제–해결–시장(TAM/SAM/SOM)–BM–트랙션–팀–Ask의 표준 IR 구조로 10장 생성. 각 장 발표 스크립트와 예상 Q&A까지.",
     steps: ["시장조사", "BM 캔버스", "IR 골격", "카피라이팅", "Q&A 대응"],
+    promptBody:
+      "초기 스타트업 IR 덱을 만든다. 아래 [아이템]을 다음 표준 구조로 10장 구성해:\n문제 → 해결 → 시장(TAM/SAM/SOM) → BM → 트랙션 → 경쟁 → 팀 → Ask.\n각 장마다 한 줄 헤드라인 + 발표 스크립트 3문장 + 들어갈 데이터/지표를 적어줘.\n마지막에 투자자 예상 Q&A 5개와 대응 포인트를 붙여줘.\n아이템: [여기에 아이템 설명]",
+    anatomy: [
+      { label: "표준 골격 주입", snippet: "문제 → 해결 → 시장 → BM → … → Ask", effect: "투자자가 기대하는 IR 순서를 그대로 박아, 아이디어가 산만하게 흩어지지 않게 한다." },
+      { label: "정량 지표 요구", snippet: "시장(TAM/SAM/SOM)", effect: "시장을 ‘크다’ 같은 형용사가 아니라 3단 추정으로 강제해, 설득력 있는 숫자가 나오게 한다." },
+      { label: "장당 산출물 고정", snippet: "헤드라인 + 발표 스크립트 3문장 + 데이터", effect: "슬라이드마다 받을 3종 세트를 지정해 발표까지 바로 쓸 수 있게 한다." },
+      { label: "리스크 선제 대응", snippet: "투자자 예상 Q&A 5개와 대응 포인트", effect: "공격 질문을 미리 뽑아 답을 준비시키는 단계 — 실전 IR에서 가장 큰 차이를 만든다." },
+    ],
   },
   {
     slug: "rag-chain-starter",
@@ -232,6 +259,14 @@ export const recipeContents: RecipeContent[] = [
     beforeSample: "LLM에 그냥 질문 → 그럴듯하지만 출처 없는 환각 답변.",
     afterSample: "검색된 청크만 근거로 쓰도록 강제하고, 인용 ID를 구조화 출력으로 반환. 평가 프롬프트로 답변 신뢰도를 자가 채점.",
     steps: ["임베딩", "검색", "리랭크", "근거 강제", "자가 평가"],
+    promptBody:
+      "You are a retrieval-grounded assistant. Use ONLY the provided [chunks] to answer.\n1) Retrieve top-k, then rerank by relevance.\n2) Answer strictly from retrieved text. If unsupported, say “not in context”.\n3) Return JSON: { answer, citations:[chunk_id], confidence }.\nThen self-grade the answer against the chunks (0-1).\nQuestion: [question]\nChunks: [chunks]",
+    anatomy: [
+      { label: "근거 제한", snippet: "Use ONLY the provided chunks", effect: "검색된 텍스트만 쓰게 막아, 모델이 그럴듯하게 지어내는 환각을 원천 차단한다." },
+      { label: "거절 경로 제공", snippet: "If unsupported, say “not in context”", effect: "답이 근거에 없을 때 ‘없음’이라 말할 길을 줘, 억지 답변을 방지한다." },
+      { label: "구조화 출력", snippet: "Return JSON: { answer, citations, confidence }", effect: "JSON 스키마를 강제해 인용 ID까지 기계가 파싱·검증할 수 있게 한다." },
+      { label: "자가 채점", snippet: "self-grade the answer against the chunks", effect: "모델이 자기 답을 근거와 대조해 점수 매기게 해, 신뢰도를 정량화한다." },
+    ],
   },
   {
     slug: "midjourney-product-shot",
@@ -263,6 +298,14 @@ export const recipeContents: RecipeContent[] = [
     beforeSample: "제품 사진 프롬프트마다 톤이 달라서 브랜드 일관성이 깨짐.",
     afterSample: "고정 시드 + 조명/렌즈/배경 파라미터를 묶어, 매번 같은 스튜디오 룩의 제품샷을 생성. 누끼·그림자까지 일관.",
     bundleCount: 6,
+    promptBody:
+      "studio product shot of [PRODUCT], soft key light + rim light, seamless [COLOR] background,\n85mm lens, shallow depth of field, crisp shadow, commercial photography\n--ar 4:5 --style raw --seed 7741 --v 7",
+    anatomy: [
+      { label: "고정 시드", snippet: "--seed 7741", effect: "시드를 박으면 같은 구도·질감이 매번 재현된다 — 브랜드 일관성의 핵심이자 재현성 그 자체." },
+      { label: "조명 명세", snippet: "soft key light + rim light", effect: "조명을 말로 고정해, 제품마다 빛이 달라지는 걸 막는다." },
+      { label: "렌즈·심도 지정", snippet: "85mm lens, shallow depth of field", effect: "실제 촬영 용어를 써서 ‘광고 사진’ 톤을 안정적으로 끌어낸다." },
+      { label: "파라미터 고정", snippet: "--ar 4:5 --style raw --v 7", effect: "비율·스타일·버전을 묶어, 누가 돌려도 같은 규격의 결과가 나오게 한다." },
+    ],
   },
   {
     slug: "design-system-prompt",
@@ -292,6 +335,14 @@ export const recipeContents: RecipeContent[] = [
     beforeSample: "컬러를 감으로 고르고 토큰 네이밍이 제각각.",
     afterSample: "브랜드 키워드 → HSL 스케일 + 시맨틱 토큰 + WCAG 대비 검증 + 컴포넌트별 사용 가이드를 일관된 네이밍으로 출력.",
     steps: ["키워드 분석", "컬러 스케일", "타이포/스페이싱", "대비 검증"],
+    promptBody:
+      "브랜드 키워드 [키워드]에서 디자인 토큰을 생성해.\n1) 키워드 → 무드 → 베이스 색상(HSL) 도출\n2) 명도 스케일 50~900 + 시맨틱 토큰(primary/surface/text…) 네이밍\n3) 각 색 쌍의 WCAG 대비비 검증, AA 미달이면 보정\n출력은 CSS 변수 + 사용 가이드 표.\n키워드: [여기에 키워드]",
+    anatomy: [
+      { label: "사고 단계 분해", snippet: "키워드 → 무드 → 베이스 색상(HSL)", effect: "색을 한 번에 찍지 않고 단계로 유도해, 감이 아니라 논리로 팔레트가 나오게 한다." },
+      { label: "네이밍 규칙", snippet: "시맨틱 토큰(primary/surface/text…) 네이밍", effect: "실무 토큰 네이밍을 지정해, 그대로 코드에 붙여 쓸 수 있게 한다." },
+      { label: "검증 내장", snippet: "WCAG 대비비 검증, AA 미달이면 보정", effect: "접근성 체크를 프롬프트 안에 넣어, 결과가 바로 기준을 통과하도록 자가 교정시킨다." },
+      { label: "출력 형식 고정", snippet: "CSS 변수 + 사용 가이드 표", effect: "토큰을 CSS로 받게 해 디자인→개발 핸드오프를 건너뛴다." },
+    ],
   },
   {
     slug: "essay-tone-tuner",
@@ -320,6 +371,14 @@ export const recipeContents: RecipeContent[] = [
     ],
     beforeSample: "글마다 톤이 흔들리고 AI 티가 남.",
     afterSample: "원문의 의미는 유지하면서 지정한 톤으로 문단 단위 재작성. 톤 가이드 표를 함께 출력해 일관성 유지.",
+    promptBody:
+      "아래 [원문]의 의미는 그대로 두고, 지정한 [톤]으로 문단 단위로 재작성해.\n톤 후보: 담백 / 따뜻 / 단정 / 위트 / 차분 / 설득.\n규칙: 한 문단 안에서 톤을 섞지 말 것. 마지막에 어떤 어휘·문장 길이로 그 톤을 냈는지 ‘톤 가이드 표’를 붙일 것.\n원문: [여기에 원문]",
+    anatomy: [
+      { label: "불변 조건 고정", snippet: "의미는 그대로 두고", effect: "의미 보존을 못 박아, 톤만 바뀌고 내용이 왜곡되는 걸 막는다." },
+      { label: "선택지 한정", snippet: "톤 후보: 담백 / 따뜻 / 단정 / 위트…", effect: "톤을 6개 프리셋으로 좁혀, 매번 일관된 결과와 비교가 가능하게 한다." },
+      { label: "일관성 규칙", snippet: "한 문단 안에서 톤을 섞지 말 것", effect: "문단 단위 톤 고정 규칙이 ‘AI 티 나는’ 톤 흔들림을 잡는다." },
+      { label: "근거 노출 요구", snippet: "‘톤 가이드 표’를 붙일 것", effect: "어떻게 그 톤을 냈는지 표로 설명하게 해, 사용자가 다음에 스스로 재현하도록 학습시킨다." },
+    ],
   },
   {
     slug: "growth-ad-ab",
@@ -350,6 +409,14 @@ export const recipeContents: RecipeContent[] = [
     beforeSample: "광고 카피를 한두 개 써보고 감으로 집행.",
     afterSample: "타깃·오퍼에서 서로 다른 심리 후크 10종을 뽑고, 각 후크를 채널 규격(길이/포맷)에 맞춰 A/B 변형으로 확장.",
     bundleCount: 10,
+    promptBody:
+      "[타깃]에게 [오퍼]를 파는 광고 카피를 만든다.\n1) 서로 다른 심리 후크 10종(손실회피/사회적증거/희소성…)으로 헤드라인 생성\n2) 각 후크를 채널 규격에 맞춰 변형: 메타(40자)/구글(제목 30자)/틱톡(훅 1문장)\n3) 후크별 A/B 2안 + 금칙어·과장표현 체크\n타깃: [타깃] / 오퍼: [오퍼]",
+    anatomy: [
+      { label: "다양성 강제", snippet: "서로 다른 심리 후크 10종", effect: "후크 유형을 10개로 못 박아, 비슷한 카피만 반복되는 걸 막고 테스트 폭을 넓힌다." },
+      { label: "채널 규격 주입", snippet: "메타(40자)/구글(제목 30자)/틱톡(훅 1문장)", effect: "채널별 글자 수를 넣어, 그대로 집행 가능한 형태로 뽑게 한다." },
+      { label: "실험 설계", snippet: "후크별 A/B 2안", effect: "처음부터 A/B 쌍으로 만들어, 성과 비교가 가능한 구조로 산출한다." },
+      { label: "리스크 가드", snippet: "금칙어·과장표현 체크", effect: "광고 심의에 걸릴 표현을 자가 점검시켜, 반려 리스크를 줄인다." },
+    ],
   },
 ];
 
@@ -602,10 +669,24 @@ function deriveContent(node: CanvasNode): RecipeContent {
   };
 }
 
+/** 재현성 점수 → 자동 검증 로그 파생 (등록 시 1회 재실행 → 캐싱된 결과를 표현) */
+function deriveVerify(content: RecipeContent, node: CanvasNode): Recipe["verify"] {
+  const match = node.reproducibility;
+  const runs = 4 + (match % 3); // 4~6회, 결정론적
+  const last = content.versionHistory.at(-1)?.date ?? "2026-06-20";
+  return {
+    runs,
+    match,
+    verifiedAt: last,
+    model: node.model,
+    sample: `동일 환경에서 ${runs}회 재실행 — 핵심 구조와 출력 형식이 제작자 결과와 ${match}% 일치했어요.`,
+  };
+}
+
 /** 노드 + 콘텐츠 → 풀 레시피 */
 export function buildRecipe(node: CanvasNode): Recipe {
   const content = contentBySlug[node.slug] ?? deriveContent(node);
-  return { ...content, ...node };
+  return { ...content, ...node, verify: deriveVerify(content, node) };
 }
 
 // ---------- 헤더용 통계 ----------

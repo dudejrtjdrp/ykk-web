@@ -6,11 +6,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import type { CanvasNode, Creator, Recipe } from "@/lib/types";
-import { krw, typeLabel } from "@/lib/format";
+import { krw, modelCost, typeLabel } from "@/lib/format";
 import { useSaved } from "@/lib/store";
 import { ReproGauge } from "@/components/ui/ReproGauge";
 import { CompareSlider } from "@/components/ui/CompareSlider";
 import { EnvCard } from "@/components/ui/EnvCard";
+import { VerifyPanel } from "@/components/ui/VerifyPanel";
+import { PromptAnatomy } from "@/components/ui/PromptAnatomy";
 import { VersionTimeline } from "@/components/ui/VersionTimeline";
 import { MasonryGallery } from "@/components/ui/MasonryGallery";
 import { NodeCard } from "@/components/NodeCard";
@@ -32,12 +34,17 @@ export function RecipeView({
   const saved = useSaved();
   const router = useRouter();
   const isSaved = saved.isSaved(recipe.slug);
+  const isPurchased = saved.isPurchased(recipe.slug);
+  const cost = modelCost(recipe.model);
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<PurchaseState>("idle");
 
   const buy = () => {
     setState("processing");
-    setTimeout(() => setState("done"), 1100);
+    setTimeout(() => {
+      saved.purchase(recipe.slug); // 구매 → AI 도움말 잠금 해제 + 작업실 저장
+      setState("done");
+    }, 1100);
   };
 
   return (
@@ -82,6 +89,25 @@ export function RecipeView({
           <EnvCard env={recipe.env} />
         </StaggerItem>
       </StaggerGroup>
+
+      {/* 자동 검증 비교 (솔루션 ①) */}
+      {recipe.verify && (
+        <Reveal className="mt-4">
+          <VerifyPanel verify={recipe.verify} sellerOutput={recipe.afterSample} />
+        </Reveal>
+      )}
+
+      {/* AI 도움말 — 프롬프트 해부 (솔루션 ③). 구매 후 잠금 해제 */}
+      <div id="ai-help">
+        <Reveal className="mt-4">
+          <PromptAnatomy
+            unlocked={isPurchased}
+            promptBody={recipe.promptBody}
+            anatomy={recipe.anatomy}
+            slug={recipe.slug}
+          />
+        </Reveal>
+      </div>
 
       {/* 받는 것 + 단계 */}
       {(recipe.steps || recipe.bundleCount) && (
@@ -188,7 +214,16 @@ export function RecipeView({
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-bold">{recipe.title}</p>
-            <p className="mono-font text-xs text-black/55">{recipe.model} · 재현성 {recipe.reproducibility}%</p>
+            <p className="mono-font flex items-center gap-1.5 text-xs text-black/55">
+              <span className="truncate">{recipe.model} · 재현성 {recipe.reproducibility}%</span>
+              <span
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-black/30 px-1.5 py-0.5 text-[0.6rem] font-bold text-black/70"
+                style={{ background: cost.free ? "var(--mint)" : "var(--paper-2)" }}
+              >
+                <span className="size-1.5 rounded-full" style={{ background: cost.free ? "var(--green)" : "var(--amber)" }} aria-hidden />
+                {cost.free ? "무료 실행" : "유료 실행"}
+              </span>
+            </p>
           </div>
           <span className="mono-font ml-auto text-lg font-black">{krw(recipe.priceKrw)}</span>
           <motion.button
@@ -210,15 +245,27 @@ export function RecipeView({
               {isSaved ? "★" : "☆"}
             </motion.span>
           </motion.button>
-          <Magnetic>
-            <button
-              type="button"
-              onClick={() => { setOpen(true); setState("idle"); }}
-              className="btn-glow rounded-full border-2 border-black bg-[#111] px-6 py-2.5 text-sm font-semibold text-white"
-            >
-              구매하기
-            </button>
-          </Magnetic>
+          {isPurchased ? (
+            <Magnetic>
+              <button
+                type="button"
+                onClick={() => router.push("/library")}
+                className="btn-glow rounded-full border-2 border-black bg-[var(--green)] px-6 py-2.5 text-sm font-semibold text-white"
+              >
+                구매함 · 작업실
+              </button>
+            </Magnetic>
+          ) : (
+            <Magnetic>
+              <button
+                type="button"
+                onClick={() => { setOpen(true); setState("idle"); }}
+                className="btn-glow rounded-full border-2 border-black bg-[#111] px-6 py-2.5 text-sm font-semibold text-white"
+              >
+                구매하기
+              </button>
+            </Magnetic>
+          )}
         </div>
       </div>
 
@@ -239,9 +286,20 @@ export function RecipeView({
               <div className="text-center">
                 <div className="mx-auto grid size-14 place-items-center rounded-full border-2 border-black bg-[var(--mint)] text-2xl">✓</div>
                 <h3 className="mt-3 display-font text-2xl font-black">작업실에 담겼어요</h3>
-                <p className="mt-2 text-sm text-black/65">{recipe.title} · 이후 버전 업데이트도 무료로 받아요.</p>
+                <p className="mt-2 text-sm text-black/65">
+                  {recipe.title} · 이제 <b>AI 도움말</b>이 열렸어요 — 이 프롬프트가 왜 작동하는지 문장 단위로 볼 수 있어요.
+                </p>
                 <div className="mt-4 grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => setOpen(false)} className="rounded-full border-2 border-black bg-white px-4 py-2.5 text-sm font-semibold">계속 탐험</button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false);
+                      setTimeout(() => document.getElementById("ai-help")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+                    }}
+                    className="rounded-full border-2 border-black bg-[var(--sun)] px-4 py-2.5 text-sm font-semibold"
+                  >
+                    AI 도움말 보기
+                  </button>
                   <button type="button" onClick={() => router.push("/library")} className="rounded-full border-2 border-black bg-[#111] px-4 py-2.5 text-sm font-semibold text-white">작업실 가기</button>
                 </div>
               </div>

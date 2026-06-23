@@ -9,7 +9,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Creator, Recipe } from "@/lib/types";
-import { krw, scoreColor, typeLabel } from "@/lib/format";
+import { krw, modelCost, scoreColor, typeLabel } from "@/lib/format";
 import { getShape } from "@/lib/canvas/shapes";
 import { useSaved } from "@/lib/store";
 import { ReproGauge } from "@/components/ui/ReproGauge";
@@ -73,6 +73,7 @@ export function RecipeModal({
   if (!recipe || !s) return <AnimatePresence />;
 
   const env = recipe.env;
+  const cost = modelCost(env.model);
   const envRows: Array<[string, string]> = [
     ["Model", env.model],
     ["Version", env.version],
@@ -161,9 +162,14 @@ export function RecipeModal({
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <div className="flex items-center gap-4 rounded-2xl bg-[var(--paper-2)] p-5">
                 <ReproGauge score={recipe.reproducibility} size={88} />
-                <p className="text-[0.84rem] leading-6 text-[var(--ink-soft)]">
-                  동일 환경에서 재실행해 제작자 결과와 일치한 비율
-                </p>
+                <div>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--mint)] px-2 py-0.5 text-[0.7rem] font-bold text-[var(--ink)]">
+                    ✓ 자동 검증
+                  </span>
+                  <p className="mt-1.5 text-[0.84rem] leading-6 text-[var(--ink-soft)]">
+                    시스템이 동일 환경에서 재실행해 제작자 결과와 일치한 비율
+                  </p>
+                </div>
               </div>
 
               <div className="rounded-2xl bg-[var(--paper-2)] p-5">
@@ -185,6 +191,15 @@ export function RecipeModal({
                     </div>
                   ))}
                 </dl>
+                {/* 모델·비용 표시 (솔루션 ②) */}
+                <div
+                  className="mt-3 flex items-center gap-2 rounded-xl px-3 py-2"
+                  style={{ background: cost.free ? "var(--mint)" : "white" }}
+                >
+                  <span className="size-1.5 shrink-0 rounded-full" style={{ background: cost.free ? "var(--green)" : "var(--amber)" }} aria-hidden />
+                  <span className="text-[0.8rem] font-semibold text-[var(--ink)]">{cost.label}</span>
+                  <span className="mono-font ml-auto text-[0.78rem] text-[var(--ink-soft)]">{cost.perRun}</span>
+                </div>
               </div>
             </div>
 
