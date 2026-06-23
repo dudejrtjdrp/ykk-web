@@ -9,9 +9,11 @@ import {
   useMemo,
   useState,
 } from "react";
+import type { MyRecipe } from "@/lib/types";
 
 const STORAGE_KEY = "ykk.saved.v1";
 const PURCHASED_KEY = "ykk.purchased.v1";
+const MINE_KEY = "ykk.mine.v1";
 
 interface SavedContextValue {
   saved: string[];
@@ -23,6 +25,10 @@ interface SavedContextValue {
   purchased: string[];
   isPurchased: (slug: string) => boolean;
   purchase: (slug: string) => void;
+  // 내가 올린(게시한) 레시피 — 작업실에 보관
+  mine: MyRecipe[];
+  publishRecipe: (recipe: MyRecipe) => void;
+  unpublishRecipe: (slug: string) => void;
 }
 
 const SavedContext = createContext<SavedContextValue | null>(null);
@@ -30,6 +36,7 @@ const SavedContext = createContext<SavedContextValue | null>(null);
 export function SavedProvider({ children }: { children: React.ReactNode }) {
   const [saved, setSaved] = useState<string[]>([]);
   const [purchased, setPurchased] = useState<string[]>([]);
+  const [mine, setMine] = useState<MyRecipe[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -38,6 +45,8 @@ export function SavedProvider({ children }: { children: React.ReactNode }) {
       if (raw) setSaved(JSON.parse(raw) as string[]);
       const rawP = window.localStorage.getItem(PURCHASED_KEY);
       if (rawP) setPurchased(JSON.parse(rawP) as string[]);
+      const rawM = window.localStorage.getItem(MINE_KEY);
+      if (rawM) setMine(JSON.parse(rawM) as MyRecipe[]);
     } catch {
       // ignore
     }
@@ -49,10 +58,11 @@ export function SavedProvider({ children }: { children: React.ReactNode }) {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
       window.localStorage.setItem(PURCHASED_KEY, JSON.stringify(purchased));
+      window.localStorage.setItem(MINE_KEY, JSON.stringify(mine));
     } catch {
       // ignore
     }
-  }, [saved, purchased, hydrated]);
+  }, [saved, purchased, mine, hydrated]);
 
   const toggle = useCallback((slug: string) => {
     setSaved((prev) =>
@@ -66,6 +76,14 @@ export function SavedProvider({ children }: { children: React.ReactNode }) {
     setSaved((prev) => (prev.includes(slug) ? prev : [slug, ...prev]));
   }, []);
 
+  const publishRecipe = useCallback((recipe: MyRecipe) => {
+    setMine((prev) => [recipe, ...prev.filter((r) => r.slug !== recipe.slug)]);
+  }, []);
+
+  const unpublishRecipe = useCallback((slug: string) => {
+    setMine((prev) => prev.filter((r) => r.slug !== slug));
+  }, []);
+
   const value = useMemo<SavedContextValue>(
     () => ({
       saved,
@@ -76,8 +94,11 @@ export function SavedProvider({ children }: { children: React.ReactNode }) {
       purchased,
       isPurchased: (slug: string) => purchased.includes(slug),
       purchase,
+      mine,
+      publishRecipe,
+      unpublishRecipe,
     }),
-    [saved, toggle, hydrated, purchased, purchase],
+    [saved, toggle, hydrated, purchased, purchase, mine, publishRecipe, unpublishRecipe],
   );
 
   return <SavedContext.Provider value={value}>{children}</SavedContext.Provider>;

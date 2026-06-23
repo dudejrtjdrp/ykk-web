@@ -8,6 +8,7 @@ import {
   creators,
   creatorsById,
   nodeBySlug,
+  recipeContents,
   regions,
 } from "@/lib/mock-data";
 import { queryRectInfinite } from "@/lib/canvas/spatial-index";
@@ -49,6 +50,14 @@ export function allCreators(): Creator[] {
 
 export function totalNodeCount(): number {
   return canvasNodes.length;
+}
+
+/** 검색 기본 추천 — 입력 전 보여줄 저작(리치) 레시피 노드 */
+export function featuredNodes(limit = 8): CanvasNode[] {
+  return recipeContents
+    .map((c) => nodeBySlug[c.slug])
+    .filter(Boolean)
+    .slice(0, limit);
 }
 
 /** 검색 — 제목·카테고리·크리에이터·모델 매칭 */

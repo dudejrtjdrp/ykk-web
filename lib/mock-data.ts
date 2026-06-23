@@ -7,15 +7,19 @@ import type {
   CanvasNode,
   Category,
   Creator,
+  DocPage,
   EnvSpec,
   GalleryResult,
+  OutputFormat,
   PromptSegment,
   Recipe,
   RecipeType,
   Region,
+  ResultArtifact,
   Review,
   VersionEntry,
 } from "@/lib/types";
+import { OUTPUT_BY_CATEGORY } from "@/lib/output-formats";
 
 export const categories: Category[] = [
   "학업",
@@ -669,17 +673,201 @@ function deriveContent(node: CanvasNode): RecipeContent {
   };
 }
 
+// ---------- 결과물 미디어 (모달/상세 최상단 · 업로드 step3) ----------
+// 텍스트가 아니라 카테고리에 맞는 미디어(이미지/PDF/Word/영상)로 보여준다.
+const DEMO_YT = "M7lc1UVf-VE"; // 목 데모 영상 — lite 임베드(클릭 시 로드)
+const slugSlug = (t: string) => t.replace(/\s+/g, "_").slice(0, 14);
+
+function hashStr(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h);
+}
+
+// 카테고리 공통 합성 슬라이드/문서 (필러 레시피용)
+function genSlides(title: string): DocPage[] {
+  return [
+    { title, lines: ["핵심 주장 3가지로 분해", "주장별 근거 슬라이드 1장", "발표자 노트 자동 생성"] },
+    { title: "근거 · 데이터", lines: ["핵심 지표 2~3개 제시", "시각화 지시 1줄", "출처 표기"] },
+    { title: "결론 & 다음 단계", lines: ["3줄 요약", "실행 제안", "예상 Q&A"] },
+  ];
+}
+function genDoc(title: string): DocPage[] {
+  return [
+    { title, lines: ["도입: 핵심 메시지 한 문장", "본문: 구조화된 세 문단", "결론: 행동 제안"] },
+    { title: "체크 · 가이드", lines: ["톤·형식 일관성 규칙", "재현용 변수 표기", "후속 활용 팁"] },
+  ];
+}
+
+type ArtifactPair = { seller: ResultArtifact; server: ResultArtifact };
+
+function pdfPair(file: string, pages: DocPage[], sNote: string, vNote: string): ArtifactPair {
+  return {
+    seller: { format: "pdf", fileName: file, pages, note: sNote },
+    server: { format: "pdf", fileName: `재실행_${file}`, pages, note: vNote },
+  };
+}
+function docPair(file: string, pages: DocPage[], sNote: string, vNote: string): ArtifactPair {
+  return {
+    seller: { format: "doc", fileName: file, pages, note: sNote },
+    server: { format: "doc", fileName: `재실행_${file}`, pages, note: vNote },
+  };
+}
+function imagesPair(
+  format: "image" | "images",
+  seller: string[],
+  server: string[],
+  sNote: string,
+  vNote: string,
+): ArtifactPair {
+  return {
+    seller: { format, images: seller, note: sNote },
+    server: { format, images: server, note: vNote },
+  };
+}
+function videoPair(p1: string, p2: string, d1: string, d2: string, sNote: string, vNote: string): ArtifactPair {
+  return {
+    seller: { format: "video", youtubeId: DEMO_YT, poster: p1, durationLabel: d1, note: sNote },
+    server: { format: "video", youtubeId: DEMO_YT, poster: p2, durationLabel: d2, note: vNote },
+  };
+}
+
+/** 저작 레시피 8종의 결과 미디어 (판매자 제출본 / 서버 재실행본) */
+const AUTHORED_RESULTS: Record<string, ArtifactPair> = {
+  "presentation-a-plus": pdfPair(
+    "ESG경영_발표.pdf",
+    [
+      { title: "ESG 경영, 왜 지금인가", lines: ["문제 정의: 규제·투자자 압력 가속", "주제를 3가지 핵심 주장으로 분해", "산출물: 12장 + 발표자 노트"] },
+      { title: "주장 ① 환경(E) 리스크", lines: ["탄소국경세 2026 시행 임박", "공급망 배출 측정 사례", "시각화: 감축 추이 라인차트"] },
+      { title: "주장 ② 사회(S) 가치", lines: ["임직원·지역 상생 지표", "사례: ESG 펀드 유치 A사", "발표자 노트 2~3문장 자동"] },
+      { title: "결론 & Q&A", lines: ["3줄 요약 → 액션 제안", "예상 질문 5개 준비", "말할 문장까지 생성"] },
+    ],
+    "제작자가 제출한 발표 PDF — 전체 12장 중 대표 4장. 주제 분해→근거→발표자 노트 구조.",
+    "동일 환경(GPT-5)에서 서버가 재생성한 발표본 — 슬라이드 골격·발표자 노트 형식 일치.",
+  ),
+  "job-statement-kit": docPair(
+    "자기소개서_지원동기.docx",
+    [
+      { title: "자기소개서 — 지원동기", lines: ["[S] 학회 운영 중 신규 회원 이탈 증가", "[T] 3개월 내 잔존율 개선 목표", "[A] 온보딩 자동화 도입·실행", "[R] 잔존율 30% → 58% 향상"] },
+      { title: "직무 역량 & 예상 면접 질문", lines: ["직무 키워드 5개 매핑", "Q. 갈등 상황 해결 경험은?", "Q. 실패에서 배운 점은?", "모범 답변 개요 포함"] },
+    ],
+    "제작자가 제출한 자소서 Word 문서 — STAR 구조 + 면접 질문 12개.",
+    "서버가 동일 프롬프트로 재작성한 문서 — STAR 골격·키워드 매핑 일치.",
+  ),
+  "startup-ir-deck": pdfPair(
+    "Pitch_Deck_SeriesA.pdf",
+    [
+      { title: "Problem — 문제", lines: ["타깃 고객의 핵심 페인포인트", "현재 대안의 한계", "Why now — 왜 지금인가"] },
+      { title: "Solution & Market", lines: ["솔루션 한 줄 정의", "TAM 4.2조 / SAM 8천억 / SOM 540억", "경쟁 우위 3가지"] },
+      { title: "BM · Traction", lines: ["수익모델: 구독 + 수수료", "MoM 성장 +21%", "리텐션 D30 44%"] },
+      { title: "Team & Ask", lines: ["핵심 팀 이력", "Series A 30억 원 조달", "사용처: 채용·GTM"] },
+    ],
+    "제작자가 제출한 IR 피치덱 PDF — 표준 10장 중 대표 4장.",
+    "서버 재실행 결과 — 동일 IR 골격(문제→해결→시장→Ask)·지표 형식 일치.",
+  ),
+  "rag-chain-starter": videoPair(
+    mockImg(3), mockImg(9), "5:42", "5:40",
+    "제작자가 올린 워크플로우 데모 — 임베딩→검색→리랭크→근거강제 5단계.",
+    "서버가 동일 체인을 재실행하며 캡처한 데모 — 단계·출력 스키마 일치.",
+  ),
+  "midjourney-product-shot": imagesPair(
+    "images",
+    [mockImg(0), mockImg(1), mockImg(2), mockImg(3)],
+    [mockImg(4), mockImg(5), mockImg(6), mockImg(7)],
+    "제작자가 올린 제품샷 4컷 — 고정 시드 스튜디오 룩.",
+    "동일 시드·파라미터로 서버가 재생성한 4컷 — 조명·그림자 일관.",
+  ),
+  "design-system-prompt": imagesPair(
+    "image",
+    [mockImg(10)],
+    [mockImg(11)],
+    "제작자가 올린 디자인 토큰 시안 이미지.",
+    "서버가 재생성한 토큰 시트 — 컬러 스케일·네이밍 일치.",
+  ),
+  "essay-tone-tuner": docPair(
+    "에세이_따뜻한톤.docx",
+    [
+      { title: "원문 → 따뜻한 톤 리라이트", lines: ["원문 의미 보존", "문단 단위 톤 적용", "어휘·문장 길이 조정"] },
+      { title: "톤 가이드 표", lines: ["담백 / 따뜻 / 단정 / 위트", "문장 길이·어미 패턴 정리", "재현용 규칙 명시"] },
+    ],
+    "제작자가 올린 리라이트 결과 문서 — 6톤 중 ‘따뜻’ 톤 예시.",
+    "서버 재실행 결과 — 톤 가이드 표 형식·문단 톤 고정 일치.",
+  ),
+  "growth-ad-ab": videoPair(
+    mockImg(14), mockImg(16), "0:32", "0:33",
+    "제작자가 올린 광고 영상 A안 — 손실회피 후크.",
+    "서버가 재생성한 B안 영상 — 채널 규격·후크 구조 일치.",
+  ),
+};
+
+/** 저작 정보가 없는(필러) 레시피 → 카테고리 형식 기반 결정론적 미디어 생성 */
+function genericArtifacts(node: CanvasNode): ArtifactPair & { format: OutputFormat } {
+  const fmt = OUTPUT_BY_CATEGORY[node.category].format;
+  const seed = hashStr(node.slug);
+  if (fmt === "images" || fmt === "image") {
+    const n = fmt === "images" ? 4 : 1;
+    const s = Array.from({ length: n }, (_, k) => mockImg(seed + k));
+    const v = Array.from({ length: n }, (_, k) => mockImg(seed + n + k));
+    return {
+      format: fmt,
+      seller: { format: fmt, images: s, note: `제작자가 올린 결과 ${n > 1 ? `${n}장` : "이미지"}.` },
+      server: { format: fmt, images: v, note: "서버가 동일 환경에서 재생성한 결과 — 톤·구도 일치." },
+    };
+  }
+  if (fmt === "pdf") {
+    const pages = genSlides(node.title);
+    return {
+      format: fmt,
+      seller: { format: "pdf", fileName: `${slugSlug(node.title)}.pdf`, pages, note: "제작자가 제출한 결과물 PDF." },
+      server: { format: "pdf", fileName: `재실행_${slugSlug(node.title)}.pdf`, pages, note: "서버가 재생성한 PDF — 구조·형식 일치." },
+    };
+  }
+  if (fmt === "doc") {
+    const pages = genDoc(node.title);
+    return {
+      format: fmt,
+      seller: { format: "doc", fileName: `${slugSlug(node.title)}.docx`, pages, note: "제작자가 제출한 Word 문서." },
+      server: { format: "doc", fileName: `재실행_${slugSlug(node.title)}.docx`, pages, note: "서버가 재생성한 문서 — 문단 구조 일치." },
+    };
+  }
+  return {
+    format: "video",
+    seller: { format: "video", youtubeId: DEMO_YT, poster: mockImg(seed), durationLabel: "4:08", note: "제작자가 올린 데모 영상." },
+    server: { format: "video", youtubeId: DEMO_YT, poster: mockImg(seed + 5), durationLabel: "4:11", note: "서버가 재실행하며 캡처한 결과 영상." },
+  };
+}
+
 /** 재현성 점수 → 자동 검증 로그 파생 (등록 시 1회 재실행 → 캐싱된 결과를 표현) */
 function deriveVerify(content: RecipeContent, node: CanvasNode): Recipe["verify"] {
   const match = node.reproducibility;
   const runs = 4 + (match % 3); // 4~6회, 결정론적
   const last = content.versionHistory.at(-1)?.date ?? "2026-06-20";
+  // 일치율(match) → 판매자 제출본과 서버 재실행본의 "차이" 요약. 이 차이가 곧 재현성으로 환산된다.
+  const diff =
+    match >= 95
+      ? "거의 동일 — 핵심 구조·출력 형식·세부 표현까지 일치했어요."
+      : match >= 90
+        ? "구조와 출력 형식은 일치 — 일부 어휘·문장 표현만 미세하게 달랐어요."
+        : match >= 85
+          ? "핵심 골격은 재현 — 세부 항목·분량에서 약간의 변동이 있었어요."
+          : "전체 골격은 재현 — 세부 내용과 톤에서 차이가 일부 보였어요.";
+  const authored = AUTHORED_RESULTS[node.slug];
+  const media = authored
+    ? { format: authored.seller.format, seller: authored.seller, server: authored.server }
+    : genericArtifacts(node);
   return {
     runs,
     match,
     verifiedAt: last,
     model: node.model,
     sample: `동일 환경에서 ${runs}회 재실행 — 핵심 구조와 출력 형식이 제작자 결과와 ${match}% 일치했어요.`,
+    diff,
+    outputFormat: media.format,
+    sellerResult: media.seller,
+    serverResult: media.server,
   };
 }
 

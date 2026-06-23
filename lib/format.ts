@@ -35,6 +35,25 @@ export interface ModelCost {
 // 무료 요금제로 돌릴 수 있는 모델군 (부분 일치)
 const FREE_MODELS = ["gemini", "llama"];
 
+/** 모델명 → 실제 실행 가능한 공식 사이트 (내 환경에 적용) */
+export interface ModelSite {
+  name: string; // 사이트 표기명
+  url: string; // 새 탭으로 여는 주소
+}
+
+export function modelSite(model: string): ModelSite {
+  const m = model.toLowerCase();
+  if (m.includes("gpt") || m.includes("chatgpt") || m.includes("dall") || m.includes("o1") || m.includes("o3"))
+    return { name: "ChatGPT", url: "https://chatgpt.com/" };
+  if (m.includes("claude")) return { name: "Claude", url: "https://claude.ai/" };
+  if (m.includes("gemini")) return { name: "Gemini", url: "https://gemini.google.com/app" };
+  if (m.includes("midjourney")) return { name: "Midjourney", url: "https://www.midjourney.com/explore" };
+  if (m.includes("llama") || m.includes("meta")) return { name: "Meta AI", url: "https://www.meta.ai/" };
+  if (m.includes("sdxl") || m.includes("stable")) return { name: "Stability AI", url: "https://stability.ai/" };
+  // 알 수 없는 모델 → 검색으로 안내
+  return { name: model, url: `https://www.google.com/search?q=${encodeURIComponent(model + " 공식 사이트")}` };
+}
+
 export function modelCost(model: string): ModelCost {
   const m = model.toLowerCase();
   const free = FREE_MODELS.some((f) => m.includes(f));

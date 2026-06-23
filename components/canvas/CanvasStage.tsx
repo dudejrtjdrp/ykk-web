@@ -1,12 +1,14 @@
 "use client";
 
 // 무한 캔버스 화면 (기획서 2장) — 엔진 + 가상화 렌더 + HUD + 접근성
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { CanvasNode } from "@/lib/types";
 import { useCanvasEngine } from "@/lib/canvas/use-canvas-engine";
 import { LOD_FAR, LOD_NEAR, PAN_KEY_STEP } from "@/lib/canvas/constants";
 import { useSaved } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
+import { Avatar } from "@/components/auth/Avatar";
 import { useRecipeModal } from "@/components/recipe/RecipeModalProvider";
 import { compact } from "@/lib/format";
 import { regions } from "@/lib/mock-data";
@@ -20,6 +22,7 @@ import { Onboarding } from "./Onboarding";
 export function CanvasStage({ onRequestFeed }: { onRequestFeed: () => void }) {
   const engine = useCanvasEngine();
   const saved = useSaved();
+  const { user, hydrated: authHydrated } = useAuth();
   const { openRecipe } = useRecipeModal();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [hover, setHover] = useState<HoverState | null>(null);
@@ -27,17 +30,19 @@ export function CanvasStage({ onRequestFeed }: { onRequestFeed: () => void }) {
   // 포커스(검색 이동·선택)된 카드 id. 빈 캔버스를 누르면 해제.
   const [focusedId, setFocusedId] = useState<string | null>(null);
 
-  const cancelClose = () => {
+  // useCallback 으로 안정화 — 이걸 props 로 받는 memo(StickerNode) 가 hover/focus 상태가
+  // 바뀔 때마다 "보이는 카드 전부" 리렌더되던 문제를 막는다. (콜백이 매 렌더 새로 생기면 memo 무력화)
+  const cancelClose = useCallback(() => {
     if (closeTimer.current != null) {
       clearTimeout(closeTimer.current);
       closeTimer.current = null;
     }
-  };
+  }, []);
   // 카드 → 미리보기로 마우스가 건너가는 동안 사라지지 않도록 닫기를 잠깐 지연
-  const scheduleClose = () => {
+  const scheduleClose = useCallback(() => {
     cancelClose();
     closeTimer.current = window.setTimeout(() => setHover(null), 160);
-  };
+  }, [cancelClose]);
 
   const zoom = engine.view.zoom;
   const tier: Tier = zoom < LOD_FAR ? "far" : zoom < LOD_NEAR ? "mid" : "near";
@@ -69,13 +74,44 @@ export function CanvasStage({ onRequestFeed }: { onRequestFeed: () => void }) {
     });
   }, [engine]);
 
+  // 팬·줌·관성 "이동 중"에만 data-busy 를 켠다 → CSS 에서 비용 큰 13px 블러 소프트 그림자를
+  // 잠깐 접어 매 프레임 그림자 재래스터를 없앤다. 멈추면 140ms 뒤 끄고 그림자 원복(정적 비주얼 동일).
+  // 엔진은 손대지 않고 카메라 구독만 사용. (값은 진입/이탈 1회만 써서 불필요한 스타일 무효화 방지)
+  useEffect(() => {
+    const stage = engine.stageRef.current;
+    if (!stage) return;
+    let idle: number | null = null;
+    const clearIdle = () => {
+      if (idle != null) {
+        clearTimeout(idle);
+        idle = null;
+      }
+    };
+    const unsub = engine.subscribe(() => {
+      if (stage.dataset.busy !== "1") stage.dataset.busy = "1";
+      clearIdle();
+      idle = window.setTimeout(() => {
+        delete stage.dataset.busy;
+        idle = null;
+      }, 140);
+    });
+    return () => {
+      clearIdle();
+      delete stage.dataset.busy;
+      unsub();
+    };
+  }, [engine]);
+
   // 카드 선택 = 포커스 + 상세 열기
-  const openNode = (node: CanvasNode) => {
-    cancelClose();
-    setHover(null);
-    setFocusedId(node.id);
-    openRecipe(node.slug);
-  };
+  const openNode = useCallback(
+    (node: CanvasNode) => {
+      cancelClose();
+      setHover(null);
+      setFocusedId(node.id);
+      openRecipe(node.slug);
+    },
+    [cancelClose, openRecipe],
+  );
 
   const flyToRegion = (r: (typeof regions)[number]) => {
     setFocusedId(null);
@@ -89,24 +125,27 @@ export function CanvasStage({ onRequestFeed }: { onRequestFeed: () => void }) {
     setFocusedId(null);
   };
 
-  const onHoverStart = (node: CanvasNode, rect: DOMRect) => {
-    const stage = engine.stageRef.current;
-    if (!stage) return;
-    const sr = stage.getBoundingClientRect();
-    const topY = rect.top - sr.top;
-    const bottomY = rect.bottom - sr.top;
-    // 위쪽 공간이 미리보기 추정 높이보다 좁으면 카드 아래로 띄워 잘림 방지
-    const EST_H = 360;
-    const placement: HoverState["placement"] = topY >= EST_H + 12 ? "above" : "below";
-    cancelClose();
-    setHover({
-      node,
-      x: rect.left - sr.left + rect.width / 2,
-      topY,
-      bottomY,
-      placement,
-    });
-  };
+  const onHoverStart = useCallback(
+    (node: CanvasNode, rect: DOMRect) => {
+      const stage = engine.stageRef.current;
+      if (!stage) return;
+      const sr = stage.getBoundingClientRect();
+      const topY = rect.top - sr.top;
+      const bottomY = rect.bottom - sr.top;
+      // 위쪽 공간이 미리보기 추정 높이보다 좁으면 카드 아래로 띄워 잘림 방지
+      const EST_H = 360;
+      const placement: HoverState["placement"] = topY >= EST_H + 12 ? "above" : "below";
+      cancelClose();
+      setHover({
+        node,
+        x: rect.left - sr.left + rect.width / 2,
+        topY,
+        bottomY,
+        placement,
+      });
+    },
+    [engine, cancelClose],
+  );
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     const tag = (e.target as HTMLElement).tagName;
@@ -190,14 +229,14 @@ export function CanvasStage({ onRequestFeed }: { onRequestFeed: () => void }) {
           <img
             src="/logo.png"
             alt="ykk"
-            width={48}
-            height={48}
+            width={56}
+            height={56}
             draggable={false}
-            className="block size-11 select-none sm:size-12"
+            className="block size-14 select-none sm:size-16"
           />
         </Link>
 
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
           <SearchTeleport
             engine={engine}
             inputRef={searchInputRef}
@@ -217,6 +256,21 @@ export function CanvasStage({ onRequestFeed }: { onRequestFeed: () => void }) {
           <Link href="/upload" className="rounded-full border-[1.5px] border-[var(--ink)] bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-[var(--paper)] shadow-[var(--shadow-soft)]">
             업로드
           </Link>
+          {authHydrated &&
+            (user ? (
+              <Link
+                href="/mypage"
+                aria-label="마이페이지"
+                className="hud-chip flex items-center gap-2 py-1 pl-1 pr-3 text-sm font-semibold"
+              >
+                <Avatar nickname={user.nickname} color={user.avatarColor} size={28} />
+                <span className="max-w-[7rem] truncate">{user.nickname}</span>
+              </Link>
+            ) : (
+              <Link href="/login" className="hud-chip rounded-full px-4 py-2 text-sm font-semibold">
+                로그인
+              </Link>
+            ))}
         </nav>
       </div>
 

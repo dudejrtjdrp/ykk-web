@@ -3,11 +3,12 @@
 // 환경 정보 카드 (기획서 4.3.2) — 모노 표기 + 복사 + 모델·비용 표시(솔루션 ②)
 import { useState } from "react";
 import type { EnvSpec } from "@/lib/types";
-import { modelCost } from "@/lib/format";
+import { modelCost, modelSite } from "@/lib/format";
 
 export function EnvCard({ env }: { env: EnvSpec }) {
   const [copied, setCopied] = useState<string | null>(null);
   const cost = modelCost(env.model);
+  const site = modelSite(env.model);
 
   const rows: Array<[string, string]> = [
     ["Model", env.model],
@@ -70,9 +71,15 @@ export function EnvCard({ env }: { env: EnvSpec }) {
           </button>
         ))}
       </dl>
-      <button type="button" className="mt-3 w-full rounded-full border-2 border-black bg-[var(--cobalt)] px-4 py-2 text-sm font-semibold text-white">
-        내 환경에 적용
-      </button>
+      {/* 내 환경에 적용 — 이 모델을 실행할 수 있는 공식 사이트로 이동 */}
+      <a
+        href={site.url}
+        target="_blank"
+        rel="noreferrer"
+        className="focus-ring mt-3 flex w-full items-center justify-center gap-1.5 rounded-full border-2 border-black bg-[var(--cobalt)] px-4 py-2 text-sm font-semibold text-white transition-transform hover:-translate-y-0.5"
+      >
+        내 환경에 적용 · {site.name}에서 열기 <span aria-hidden>↗</span>
+      </a>
     </div>
   );
 }

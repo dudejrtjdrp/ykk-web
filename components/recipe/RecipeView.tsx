@@ -9,12 +9,12 @@ import type { CanvasNode, Creator, Recipe } from "@/lib/types";
 import { krw, modelCost, typeLabel } from "@/lib/format";
 import { useSaved } from "@/lib/store";
 import { ReproGauge } from "@/components/ui/ReproGauge";
-import { CompareSlider } from "@/components/ui/CompareSlider";
 import { EnvCard } from "@/components/ui/EnvCard";
-import { VerifyPanel } from "@/components/ui/VerifyPanel";
+import { ResultCompare } from "@/components/ui/ResultCompare";
 import { PromptAnatomy } from "@/components/ui/PromptAnatomy";
 import { VersionTimeline } from "@/components/ui/VersionTimeline";
 import { MasonryGallery } from "@/components/ui/MasonryGallery";
+import { CautionCard } from "@/components/ui/CautionCard";
 import { NodeCard } from "@/components/NodeCard";
 import { Reveal, StaggerGroup, StaggerItem } from "@/components/ui/Reveal";
 import { Magnetic } from "@/components/ui/Magnetic";
@@ -26,10 +26,12 @@ export function RecipeView({
   recipe,
   creator,
   related,
+  sameCreator,
 }: {
   recipe: Recipe;
   creator?: Creator;
   related: CanvasNode[];
+  sameCreator: CanvasNode[];
 }) {
   const saved = useSaved();
   const router = useRouter();
@@ -58,9 +60,9 @@ export function RecipeView({
         <span className="font-semibold text-black">{recipe.title}</span>
       </div>
 
-      {/* hero */}
-      <StaggerGroup gap={0.08} amount={0.1} className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <StaggerItem className="sticker overflow-hidden p-4">
+      {/* hero: 제목·메타 (슬림) */}
+      <Reveal>
+        <section className="sticker p-4 sm:p-5">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <span className="mono-font rounded-full border-2 border-black bg-[var(--paper-2)] px-2.5 py-1 text-[0.6rem] font-bold uppercase tracking-[0.14em]">
               {typeLabel[recipe.type]}
@@ -70,32 +72,29 @@ export function RecipeView({
           </div>
           <h1 className="display-font text-4xl font-black leading-[0.95] text-black sm:text-5xl">{recipe.title}</h1>
           <p className="mt-3 max-w-2xl text-pretty text-sm leading-7 text-black/75">{recipe.summary}</p>
+        </section>
+      </Reveal>
 
-          <div className="mt-4 h-px w-full bg-black/10" />
-          <p className="mono-font mt-4 text-[0.62rem] uppercase tracking-[0.2em] text-black/55">before / after · 동일 환경 재실행 비교</p>
-          <div className="mt-2 h-56">
-            <CompareSlider before={recipe.beforeSample} after={recipe.afterSample} />
+      {/* 결과물 비교 — 판매자 제출 vs 서버 재실행 (미디어 우선, 최상단) (솔루션 ①) */}
+      {recipe.verify && (
+        <Reveal className="mt-4">
+          <ResultCompare verify={recipe.verify} variant="full" />
+        </Reveal>
+      )}
+
+      {/* 재현성 + 환경 */}
+      <StaggerGroup gap={0.08} amount={0.1} className="mt-4 grid gap-4 lg:grid-cols-2">
+        <StaggerItem className="sticker flex items-center gap-4 p-4">
+          <ReproGauge score={recipe.reproducibility} />
+          <div className="text-sm leading-6 text-black/70">
+            <p className="font-semibold text-black">독립 재실행 검증</p>
+            <p className="mt-1">동일 환경에서 여러 번 재실행해 제작자 결과와 일치한 비율입니다.</p>
           </div>
         </StaggerItem>
-
-        <StaggerItem className="flex flex-col gap-4">
-          <div className="sticker flex items-center gap-4 p-4">
-            <ReproGauge score={recipe.reproducibility} />
-            <div className="text-sm leading-6 text-black/70">
-              <p className="font-semibold text-black">독립 재실행 검증</p>
-              <p className="mt-1">동일 환경에서 여러 번 재실행해 제작자 결과와 일치한 비율입니다.</p>
-            </div>
-          </div>
+        <StaggerItem>
           <EnvCard env={recipe.env} />
         </StaggerItem>
       </StaggerGroup>
-
-      {/* 자동 검증 비교 (솔루션 ①) */}
-      {recipe.verify && (
-        <Reveal className="mt-4">
-          <VerifyPanel verify={recipe.verify} sellerOutput={recipe.afterSample} />
-        </Reveal>
-      )}
 
       {/* AI 도움말 — 프롬프트 해부 (솔루션 ③). 구매 후 잠금 해제 */}
       <div id="ai-help">
@@ -126,6 +125,11 @@ export function RecipeView({
           </div>
         </section>
       )}
+
+      {/* 주의사항 — 재배포 금지 등 이용 약관 (받는 것 바로 다음에 배치) */}
+      <Reveal className="mt-4">
+        <CautionCard cautions={recipe.cautions} />
+      </Reveal>
 
       {/* 타임라인 */}
       <section className="mt-4">
@@ -193,7 +197,32 @@ export function RecipeView({
         )}
       </Reveal>
 
-      {/* 관련 레시피 */}
+      {/* 같은 작가의 다른 레시피 */}
+      {sameCreator.length > 0 && (
+        <section className="mt-6">
+          <Reveal>
+            <div className="mb-3 flex items-end justify-between gap-2">
+              <h2 className="display-font text-xl font-black">
+                {creator ? `${creator.name}님의 다른 레시피` : "같은 작가의 다른 레시피"}
+              </h2>
+              {creator && (
+                <Link href={`/creator/${creator.id}`} className="shrink-0 text-sm font-semibold text-black/55 hover:text-black">
+                  작업실 전체 보기 →
+                </Link>
+              )}
+            </div>
+          </Reveal>
+          <StaggerGroup gap={0.05} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {sameCreator.map((n) => (
+              <StaggerItem key={n.id}>
+                <NodeCard node={n} />
+              </StaggerItem>
+            ))}
+          </StaggerGroup>
+        </section>
+      )}
+
+      {/* 같은 분야의 다른 레시피 */}
       {related.length > 0 && (
         <section className="mt-6">
           <Reveal>

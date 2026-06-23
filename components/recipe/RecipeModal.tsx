@@ -9,10 +9,11 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Creator, Recipe } from "@/lib/types";
-import { krw, modelCost, scoreColor, typeLabel } from "@/lib/format";
+import { krw, modelCost, modelSite, scoreColor, typeLabel } from "@/lib/format";
 import { getShape } from "@/lib/canvas/shapes";
 import { useSaved } from "@/lib/store";
 import { ReproGauge } from "@/components/ui/ReproGauge";
+import { ResultCompare } from "@/components/ui/ResultCompare";
 import { CutShape } from "@/components/canvas/CutShape";
 import { popIn } from "@/lib/motion";
 
@@ -74,6 +75,7 @@ export function RecipeModal({
 
   const env = recipe.env;
   const cost = modelCost(env.model);
+  const site = modelSite(env.model);
   const envRows: Array<[string, string]> = [
     ["Model", env.model],
     ["Version", env.version],
@@ -156,12 +158,19 @@ export function RecipeModal({
 
           {/* ── 스크롤 본문 ── */}
           <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar px-6 pb-6 sm:px-8">
-            <p className="mt-5 text-[1rem] leading-7 text-[var(--ink)]/90">{recipe.summary}</p>
+            {/* 결과물 비교 — 판매자 제출 vs 서버 재실행 (미디어 우선, 최상단) */}
+            {recipe.verify && (
+              <div className="mt-5">
+                <ResultCompare verify={recipe.verify} variant="compact" />
+              </div>
+            )}
+
+            <p className="mt-6 text-[1rem] leading-7 text-[var(--ink)]/90">{recipe.summary}</p>
 
             {/* 재현성 + 환경 */}
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <div className="flex items-center gap-4 rounded-2xl bg-[var(--paper-2)] p-5">
-                <ReproGauge score={recipe.reproducibility} size={88} />
+                <ReproGauge score={recipe.reproducibility} size={104} />
                 <div>
                   <span className="inline-flex items-center gap-1 rounded-full bg-[var(--mint)] px-2 py-0.5 text-[0.7rem] font-bold text-[var(--ink)]">
                     ✓ 자동 검증
@@ -200,25 +209,17 @@ export function RecipeModal({
                   <span className="text-[0.8rem] font-semibold text-[var(--ink)]">{cost.label}</span>
                   <span className="mono-font ml-auto text-[0.78rem] text-[var(--ink-soft)]">{cost.perRun}</span>
                 </div>
+                {/* 내 환경에 적용 → 모델 공식 사이트로 이동 */}
+                <a
+                  href={site.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="focus-ring mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--cobalt)] px-3 py-2 text-[0.82rem] font-semibold text-white transition-transform hover:-translate-y-0.5"
+                >
+                  {site.name}에서 열기 <span aria-hidden>↗</span>
+                </a>
               </div>
             </div>
-
-            {/* before / after — 정적 비교(드래그 핸들 없이 깔끔하게) */}
-            <Section title="Before / after">
-              <div className="grid grid-cols-1 gap-px overflow-hidden rounded-2xl bg-black/[0.08] sm:grid-cols-2">
-                <div className="bg-[var(--paper-2)] p-4">
-                  <span className="text-[0.74rem] font-semibold text-[var(--ink-soft)]">Before · 제작자</span>
-                  <p className="mt-2 text-[0.86rem] leading-6 text-[var(--ink)]/85">{recipe.beforeSample}</p>
-                </div>
-                <div className="bg-white p-4">
-                  <span className="inline-flex items-center gap-1.5 text-[0.74rem] font-semibold text-[var(--green)]">
-                    <span className="size-1.5 rounded-full bg-[var(--green)]" aria-hidden />
-                    After · 재실행
-                  </span>
-                  <p className="mt-2 text-[0.86rem] leading-6 text-[var(--ink)]/85">{recipe.afterSample}</p>
-                </div>
-              </div>
-            </Section>
 
             {/* 받는 것 */}
             {(recipe.steps || recipe.bundleCount) && (
